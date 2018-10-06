@@ -1,5 +1,8 @@
-﻿using System.IO;
+﻿using System;
+using System.Diagnostics;
+using System.IO;
 using System.Text;
+using static System.Console;
 
 namespace PFSBuilder
 {
@@ -25,6 +28,16 @@ namespace PFSBuilder
     {
         private static void Main(string[] args)
         {
+            if (args.Length < 2)
+            {
+                WriteLine("Usage: PFSBuilder.exe <Input folder> <Output filename>");
+                Environment.Exit(1);
+            }
+
+            var Time = new Stopwatch();
+
+            Time.Start();
+
             var InputFiles = Directory.GetFiles(args[0]);
             var Len = InputFiles.Length;
             var StringTable = new string[Len];
@@ -64,10 +77,14 @@ namespace PFSBuilder
             var Buf = new BufferedStream(Output);
             var Writer = new BinaryWriter(Buf);
 
+            WriteLine("Writing header to PFS...");
+
             Writer.Write(Pfs.Magic);
             Writer.Write(Pfs.NumOfFiles);
             Writer.Write(Pfs.StrTableSize);
             Writer.Write(Pfs.Padding);
+
+            WriteLine("Writing entries to PFS...");
 
             foreach (var Entry in Pfs.Entries)
             {
@@ -76,6 +93,8 @@ namespace PFSBuilder
                 Writer.Write(Entry.StrTableOffset);
                 Writer.Write(Entry.Padding);
             }
+
+            WriteLine("Writing string table to PFS...\n");
 
             for (int i = 0; i < Pfs.StringTable.Length; i++)
             {
@@ -86,11 +105,17 @@ namespace PFSBuilder
             {
                 var Read = File.OpenRead(InputFiles[i]);
                 var Buf2 = new BufferedStream(Read);
+
+                WriteLine("Adding {0} to PFS...", Pfs.StringTable[i].Trim('\0'));
+
                 Buf2.CopyTo(Buf);
                 Buf2.Close();
                 Read.Close();
             }
 
+            WriteLine("\nSuccessfully packed PFS in {0}ms!", Time.ElapsedMilliseconds);
+
+            Time.Stop();
             Buf.Close();
             Writer.Close();
             Output.Close();
