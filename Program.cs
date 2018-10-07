@@ -73,52 +73,52 @@ namespace PFSBuilder
                 StringTable = StringTable
             };
 
-            var Output = File.OpenWrite(args[1]);
-            var Buf = new BufferedStream(Output);
-            var Writer = new BinaryWriter(Buf);
-
-            WriteLine("Writing header to PFS...");
-
-            Writer.Write(Pfs.Magic);
-            Writer.Write(Pfs.NumOfFiles);
-            Writer.Write(Pfs.StrTableSize);
-            Writer.Write(Pfs.Padding);
-
-            WriteLine("Writing entries to PFS...");
-
-            foreach (var Entry in Pfs.Entries)
+            using (var Output = File.OpenWrite(args[1]))
             {
-                Writer.Write(Entry.Offset);
-                Writer.Write(Entry.Size);
-                Writer.Write(Entry.StrTableOffset);
-                Writer.Write(Entry.Padding);
+                using (var Buf = new BufferedStream(Output, 0x4000))
+                {
+                    using (var Writer = new BinaryWriter(Buf))
+                    {
+                        WriteLine("Writing header to PFS...");
+
+                        Writer.Write(Pfs.Magic);
+                        Writer.Write(Pfs.NumOfFiles);
+                        Writer.Write(Pfs.StrTableSize);
+                        Writer.Write(Pfs.Padding);
+
+                        WriteLine("Writing entries to PFS...");
+
+                        foreach (var Entry in Pfs.Entries)
+                        {
+                            Writer.Write(Entry.Offset);
+                            Writer.Write(Entry.Size);
+                            Writer.Write(Entry.StrTableOffset);
+                            Writer.Write(Entry.Padding);
+                        }
+
+                        WriteLine("Writing string table to PFS...\n");
+
+                        for (int i = 0; i < Pfs.StringTable.Length; i++)
+                        {
+                            Writer.Write(Encoding.ASCII.GetBytes(Pfs.StringTable[i]));
+                        }
+
+                        for (int i = 0; i < Len; i++)
+                        {
+                            WriteLine("Adding {0} to PFS...", Pfs.StringTable[i].Trim('\0'));
+                            using (var Read = File.OpenRead(InputFiles[i]))
+                            {
+                                using (var Buf2 = new BufferedStream(Read))
+                                {
+                                    Buf2.CopyTo(Buf);
+                                }
+                            }
+                        }
+
+                        WriteLine("\nSuccessfully packed PFS in {0}ms!", Time.ElapsedMilliseconds);
+                    }
+                }
             }
-
-            WriteLine("Writing string table to PFS...\n");
-
-            for (int i = 0; i < Pfs.StringTable.Length; i++)
-            {
-                Writer.Write(Encoding.ASCII.GetBytes(Pfs.StringTable[i]));
-            }
-
-            for (int i = 0; i < Len; i++)
-            {
-                var Read = File.OpenRead(InputFiles[i]);
-                var Buf2 = new BufferedStream(Read);
-
-                WriteLine("Adding {0} to PFS...", Pfs.StringTable[i].Trim('\0'));
-
-                Buf2.CopyTo(Buf);
-                Buf2.Close();
-                Read.Close();
-            }
-
-            WriteLine("\nSuccessfully packed PFS in {0}ms!", Time.ElapsedMilliseconds);
-
-            Time.Stop();
-            Buf.Close();
-            Writer.Close();
-            Output.Close();
         }
     }
 }
